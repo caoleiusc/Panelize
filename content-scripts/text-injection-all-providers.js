@@ -197,7 +197,7 @@
       return 'claude';
     } else if (hostname.includes('gemini.google.com')) {
       return 'gemini';
-    } else if (hostname.includes('grok.com')) {
+    } else if (hostname.includes('grok.com') || hostname.includes('x.com')) {
       return 'grok';
     } else if (hostname.includes('deepseek.com')) {
       return 'deepseek';
@@ -514,10 +514,20 @@
         }
 
         if (!inserted) {
-          // Fallback: manually append text node
-          const textNode = document.createTextNode(text);
-          element.appendChild(textNode);
-          element.dispatchEvent(new Event('input', { bubbles: true }));
+          // Fallback: simulate paste event instead of breaking React DOM with appendChild
+          try {
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', text);
+            const pasteEvent = new ClipboardEvent('paste', {
+              bubbles: true,
+              cancelable: true,
+              clipboardData: dataTransfer
+            });
+            element.dispatchEvent(pasteEvent);
+            inserted = true;
+          } catch(e) {
+            console.error('Paste simulation failed', e);
+          }
         }
 
         // Ensure cursor is at the end after insertion

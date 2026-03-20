@@ -22,7 +22,7 @@ import {
 
 
 // ===== State Management =====
-let currentLayout = '1x3';
+let currentLayout = '1x2';
 let panels = []; // Array of { id, providerId, iframe, state }
 let uploadedImages = []; // Array of uploaded images { id, name, type, dataUrl }
 let loadingIframeCount = 0; // Track iframes still loading, used for focus protection
@@ -35,7 +35,7 @@ let currentOpenMode = 'tab'; // 'tab' 或 'popup'
 let isPopupWindow = false;   // 当前窗口是否为弹出窗口
 
 // Default panel configuration
-const DEFAULT_PROVIDERS = ['chatgpt', 'claude', 'gemini', 'grok', 'deepseek', 'kimi', 'google'];
+const DEFAULT_PROVIDERS = ['gemini', 'grok'];
 const MAX_PANELS = 7;
 const PENDING_MULTI_PANEL_ACTION_KEY = 'pendingMultiPanelAction';
 const LAYOUT_PANEL_COUNTS = {
@@ -203,7 +203,7 @@ function registerRuntimeMessageListener() {
 async function loadSettings() {
   try {
     const settings = await chrome.storage.sync.get({
-      multiPanelLayout: '1x3',
+      multiPanelLayout: '1x2',
       multiPanelProviders: DEFAULT_PROVIDERS,
       openMode: 'tab'
     });
@@ -370,16 +370,11 @@ async function initializePanels() {
       multiPanelProviders: DEFAULT_PROVIDERS
     });
 
-    // Use providerOrder if available (from settings page), fallback to multiPanelProviders
-    let providerIds;
-    if (settings.providerOrder && Array.isArray(settings.providerOrder) && settings.providerOrder.length > 0) {
-      // Use providerOrder directly since it now reflects enabled providers in correct order
-      // Filter to ensure all providers in providerOrder are actually enabled
-      providerIds = settings.providerOrder.filter(id => settings.enabledProviders.includes(id));
-    } else {
-      // Fallback: use enabledProviders in their stored order, or multiPanelProviders
-      providerIds = settings.enabledProviders || settings.multiPanelProviders;
-    }
+    // Use multiPanelProviders directly as it strictly tracks the actual open panels in the dashboard.
+    // Fallback to enabled providers if multiPanelProviders is somehow empty.
+    let providerIds = (settings.multiPanelProviders && settings.multiPanelProviders.length > 0) 
+      ? settings.multiPanelProviders 
+      : settings.enabledProviders;
 
     const panelCount = LAYOUT_PANEL_COUNTS[currentLayout] || 4;
     const count = Math.min(providerIds.length, panelCount);
@@ -517,8 +512,7 @@ async function addPanel(providerId) {
       </div>
       <iframe
         src="${provider.url}"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-        allow="clipboard-read; clipboard-write"
+        allow="clipboard-read; clipboard-write; display-capture; microphone; camera"
       ></iframe>
     </div>
   `;
@@ -827,6 +821,44 @@ async function sendToPanel(panel, text, images = [], autoSubmit = true) {
       resolve(false);
     }
   });
+}
+
+async function handleCrossCopy(direction) {
+  if (panels.length < 2) {
+    showToast('Need exactly 2 panels for cross-copy');
+    return;
+  }
+  
+  const sourceIndex = direction === 'left-to-right' ? 0 : 1;
+  const targetIndex = direction === 'left-to-right' ? 1 : 0;
+  
+  const sourcePanel = panels[sourceIndex];
+  const targetPanel = panels[targetIndex];
+  
+  if (!sourcePanel.iframe || !sourcePanel.iframe.contentWindow) return;
+  
+  try {
+    const channel = new MessageChannel();
+    
+    channel.port1.onmessage = async (e) => {
+      if (e.data && e.data.success && e.data.text) {
+        showToast('Copied output, pasting to target...');
+        await sendToPanel(targetPanel, e.data.text, [], false);
+      } else {
+        showToast('No output found to copy');
+      }
+    };
+    
+    // Request output from content script inside iframe
+    sourcePanel.iframe.contentWindow.postMessage(
+      { type: 'EXTRACT_LATEST_OUTPUT', context: 'multi-panel' },
+      '*',
+      [channel.port2]
+    );
+  } catch (err) {
+    showToast('Cross copy error');
+    console.error(err);
+  }
 }
 
 // Clear all input boxes (unified input + all panels)
@@ -1259,6 +1291,16 @@ function setupEventListeners() {
   const toggleModeBtn = document.getElementById('toggle-open-mode-btn');
   if (toggleModeBtn) {
     toggleModeBtn.addEventListener('click', toggleOpenMode);
+  }
+
+  // Cross-copy buttons
+  const copyLeftBtn = document.getElementById('copy-left-btn');
+  const copyRightBtn = document.getElementById('copy-right-btn');
+  if (copyLeftBtn) {
+    copyLeftBtn.addEventListener('click', () => handleCrossCopy('right-to-left'));
+  }
+  if (copyRightBtn) {
+    copyRightBtn.addEventListener('click', () => handleCrossCopy('left-to-right'));
   }
 
   // Prompt library button

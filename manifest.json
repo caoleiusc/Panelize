@@ -18,6 +18,9 @@
     "*://claude.ai/*",
     "*://gemini.google.com/*",
     "*://grok.com/*",
+    "*://accounts.x.ai/*",
+    "*://x.com/*",
+    "*://twitter.com/*",
     "*://chat.deepseek.com/*",
     "*://www.kimi.com/*",
     "*://kimi.com/*",
@@ -72,6 +75,7 @@
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-chatgpt.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_end",
@@ -85,6 +89,7 @@
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-claude.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_end",
@@ -98,6 +103,7 @@
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-gemini.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_start",
@@ -105,13 +111,27 @@
     },
     {
       "matches": [
-        "https://grok.com/*"
+        "https://grok.com/*",
+        "https://x.com/*"
+      ],
+      "js": [
+        "content-scripts/anti-frame-detection.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://grok.com/*",
+        "https://x.com/*"
       ],
       "js": [
         "content-scripts/button-finder-utils.js",
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-grok.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_start",
@@ -126,6 +146,7 @@
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-deepseek.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_start",
@@ -141,6 +162,7 @@
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-kimi.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_start",
@@ -154,6 +176,7 @@
         "content-scripts/enter-behavior-utils.js",
         "content-scripts/enter-behavior-google.js",
         "content-scripts/text-injection-all-providers.js",
+        "content-scripts/extract-latest-output.js",
         "content-scripts/focus-toggle.js"
       ],
       "run_at": "document_end",
