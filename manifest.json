@@ -9,13 +9,16 @@
     "contextMenus",
     "activeTab",
     "scripting",
+    "cookies",
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "*://chatgpt.com/*",
     "*://chat.openai.com/*",
+    "*://auth.openai.com/*",
     "*://claude.ai/*",
+    "*://*.claude.ai/*",
     "*://gemini.google.com/*",
     "*://grok.com/*",
     "*://accounts.x.ai/*",
@@ -69,6 +72,19 @@
     {
       "matches": [
         "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://auth.openai.com/*"
+      ],
+      "js": [
+        "content-scripts/anti-frame-detection.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
         "https://chat.openai.com/*"
       ],
       "js": [
@@ -112,7 +128,8 @@
     {
       "matches": [
         "https://grok.com/*",
-        "https://x.com/*"
+        "https://x.com/*",
+        "https://accounts.x.ai/*"
       ],
       "js": [
         "content-scripts/anti-frame-detection.js"
@@ -124,7 +141,8 @@
     {
       "matches": [
         "https://grok.com/*",
-        "https://x.com/*"
+        "https://x.com/*",
+        "https://accounts.x.ai/*"
       ],
       "js": [
         "content-scripts/button-finder-utils.js",

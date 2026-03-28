@@ -1182,7 +1182,126 @@
       });
     }
   }
+  // Inject custom CSS/UI to fix provider specific issues inside panels
+  function injectProviderSpecificStyles(provider) {
+    if (provider === 'claude') {
+      injectNavButton('claude-nav-btn', '粘贴 claude.ai 对话链接，回车跳转', 'https://claude.ai/chat/');
+    } else if (provider === 'grok') {
+      injectNavButton('grok-nav-btn', '粘贴 grok.com 对话链接，回车跳转', 'https://grok.com/chat/');
+    }
+  }
 
-  // Listen for messages from the multi-panel host
-  window.addEventListener('message', handleTextInjection);
+  // Inject a floating navigation button into provider iframe for quick conversation switching
+  function injectNavButton(btnId, placeholder, defaultPrefix) {
+    if (document.getElementById(btnId)) return;
+
+    const btn = document.createElement('div');
+    btn.id = btnId;
+    btn.innerText = '🔗';
+    btn.style.cssText = `
+      position: fixed;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99999;
+      background: #1a1a1a;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+    `;
+    btn.onmouseenter = () => btn.style.opacity = '1';
+    btn.onmouseleave = () => btn.style.opacity = '0.4';
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+      display: none;
+      position: fixed;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99999;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 8px;
+      width: 340px;
+    `;
+
+    const input = document.createElement('input');
+    input.placeholder = placeholder;
+    input.style.cssText = `
+      width: 100%;
+      background: #2a2a2a;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 13px;
+      box-sizing: border-box;
+      outline: none;
+    `;
+
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        let url = input.value.trim();
+        if (!url.startsWith('http')) {
+          url = defaultPrefix + url;
+        }
+        window.location.href = url;
+        box.style.display = 'none';
+        input.value = '';
+      }
+      if (e.key === 'Escape') {
+        box.style.display = 'none';
+        input.value = '';
+      }
+    };
+
+    box.appendChild(input);
+
+    const insertUI = () => {
+      if (document.body) {
+        document.body.appendChild(btn);
+        document.body.appendChild(box);
+      } else {
+        setTimeout(insertUI, 100);
+      }
+    };
+    insertUI();
+
+    btn.onclick = () => {
+      const visible = box.style.display === 'block';
+      box.style.display = visible ? 'none' : 'block';
+      if (!visible) setTimeout(() => input.focus(), 50);
+    };
+
+    document.addEventListener('click', (e) => {
+      if (!box.contains(e.target) && e.target !== btn) {
+        box.style.display = 'none';
+      }
+    });
+  }
+
+  // --- Main Initialization ---
+  function init() {
+    if (window.name !== 'panelize-iframe') return;
+    if (window._panelizeTextInjectorInitialized) return;
+    window._panelizeTextInjectorInitialized = true;
+
+    const provider = detectProvider();
+    
+    if (provider) {
+      injectProviderSpecificStyles(provider);
+    }
+
+    // Listen for messages from the multi-panel host
+    window.addEventListener('message', handleTextInjection);
+  }
+
+  // Run initialization
+  init();
 })();

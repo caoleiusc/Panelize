@@ -32,6 +32,82 @@ async function loadOpenModeSetting() {
   }
 }
 
+// ============================================
+// Cookie SameSite Fix for iframe embedding
+// ============================================
+// ChatGPT/OpenAI set cookies with SameSite=Lax (browser default).
+// In a chrome-extension:// iframe, this is a cross-site context,
+// so the browser refuses to send those cookies → perpetual "session ended" loop.
+// Fix: use chrome.cookies API to re-set them with SameSite=None; Secure.
+
+const COOKIE_FIX_DOMAINS = ['chatgpt.com', 'openai.com'];
+
+function shouldFixCookieSameSite(cookie) {
+  if (cookie.sameSite === 'no_restriction') return false;
+  return COOKIE_FIX_DOMAINS.some(d =>
+    cookie.domain === d ||
+    cookie.domain === `.${d}` ||
+    cookie.domain.endsWith(`.${d}`)
+  );
+}
+
+async function fixCookieSameSite(cookie) {
+  try {
+    const domain = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+    const url = `https://${domain}${cookie.path}`;
+
+    const details = {
+      url,
+      name: cookie.name,
+      value: cookie.value,
+      path: cookie.path,
+      secure: true,          // Required for SameSite=None
+      httpOnly: cookie.httpOnly,
+      sameSite: 'no_restriction'  // = SameSite=None
+    };
+
+    // Respect hostOnly flag (important for __Host- prefixed cookies)
+    if (!cookie.hostOnly) {
+      details.domain = cookie.domain;
+    }
+
+    // Only set expirationDate for persistent cookies (omit for session cookies)
+    if (cookie.expirationDate) {
+      details.expirationDate = cookie.expirationDate;
+    }
+
+    await chrome.cookies.set(details);
+  } catch (e) {
+    // Silently ignore – some cookies may be protected
+  }
+}
+
+async function fixProviderCookies() {
+  if (!chrome.cookies) return;
+  for (const domain of COOKIE_FIX_DOMAINS) {
+    try {
+      const cookies = await chrome.cookies.getAll({ domain });
+      for (const cookie of cookies) {
+        if (shouldFixCookieSameSite(cookie)) {
+          await fixCookieSameSite(cookie);
+        }
+      }
+    } catch (e) {
+      // Ignore errors for individual domains
+    }
+  }
+}
+
+// Reactively fix new cookies as they are set
+if (chrome.cookies && chrome.cookies.onChanged) {
+  chrome.cookies.onChanged.addListener((changeInfo) => {
+    if (changeInfo.removed) return;
+    if (shouldFixCookieSameSite(changeInfo.cookie)) {
+      fixCookieSameSite(changeInfo.cookie);
+    }
+  });
+}
+
 async function setPendingMultiPanelAction(action, payload = {}) {
   const pendingAction = {
     action,
@@ -55,6 +131,9 @@ async function setPendingMultiPanelAction(action, payload = {}) {
 
 // 新增：打开 Multi-Panel 的函数（支持标签页和弹出窗口两种模式）
 async function openMultiPanel() {
+  // Fix cookies before loading iframes to ensure sessions work
+  await fixProviderCookies();
+
   const multiPanelUrl = chrome.runtime.getURL('multi-panel/multi-panel.html');
 
   if (openMode === 'popup') {
@@ -90,11 +169,13 @@ chrome.runtime.onInstalled.addListener(async () => {
   await createContextMenus();
   await loadShortcutSetting();
   await loadOpenModeSetting();
+  await fixProviderCookies();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   await loadShortcutSetting();
   await loadOpenModeSetting();
+  await fixProviderCookies();
 });
 
 // Create/update context menus

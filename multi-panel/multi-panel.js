@@ -497,6 +497,9 @@ async function addPanel(providerId) {
         <span>${provider.name}</span>
       </div>
       <div class="panel-header-right">
+        <button class="open-tab-btn" title="Open in New Tab">
+          <span class="material-symbols-outlined">open_in_new</span>
+        </button>
         <button class="refresh-panel-btn" title="Refresh">
           <span class="material-symbols-outlined">refresh</span>
         </button>
@@ -512,6 +515,7 @@ async function addPanel(providerId) {
       </div>
       <iframe
         src="${provider.url}"
+        name="panelize-iframe"
         allow="clipboard-read; clipboard-write; display-capture; microphone; camera"
       ></iframe>
     </div>
@@ -546,6 +550,11 @@ async function addPanel(providerId) {
     loadingEl.innerHTML = `<img src="${provider.icon}" alt="${provider.name}" class="loading-icon"><span class="loading-text">Loading ${provider.name}...</span>`;
     loadingIframeCount++;
     iframe.src = provider.url;
+  });
+
+  const openTabBtn = panelEl.querySelector('.open-tab-btn');
+  openTabBtn.addEventListener('click', () => {
+    window.open(provider.url, '_blank');
   });
 
   const switchBtn = panelEl.querySelector('.switch-provider-btn');

@@ -87,6 +87,8 @@ function checkPageFocus() {
 
 // Listen for messages from service worker
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (window.name !== 'panelize-iframe') return false;
+
   if (message.action === 'checkFocus') {
     sendResponse({ hasFocus: checkPageFocus() });
   } else if (message.action === 'takeFocus') {

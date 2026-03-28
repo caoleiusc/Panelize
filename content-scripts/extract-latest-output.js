@@ -38,25 +38,57 @@
           break;
         case 'claude':
           {
-            // Try selectors in order of reliability (most specific first)
-            const claudeSelectors = [
-              '[data-testid="assistant-message"]',
-              '.font-claude-message',
-              '.claude-message',
-              '[data-is-streaming="false"] .prose',
-              '.prose:not([contenteditable])',
-              '[class*="assistant"] .prose',
-              '[class*="message-content"]'
-            ];
-            for (const sel of claudeSelectors) {
-              const els = document.querySelectorAll(sel);
-              if (els.length > 0) {
-                const candidate = els[els.length - 1];
-                if (candidate && candidate.innerText && candidate.innerText.trim()) {
+            // Strategy 1: Use data-message-author-role attribute
+            const assistantMsgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+            if (assistantMsgs.length > 0) {
+              const lastMsg = assistantMsgs[assistantMsgs.length - 1];
+              const textContainer = lastMsg.querySelector('.font-claude-message') || lastMsg;
+              const text = (textContainer.innerText || '').trim();
+              if (text.length > 0) {
+                targetElement = textContainer;
+                break;
+              }
+            }
+
+            // Strategy 2: data-testid based selectors (recent Claude UI)
+            const testIdMsgs = document.querySelectorAll('[data-testid*="assistant"], [data-testid*="chat-message"]');
+            if (testIdMsgs.length > 0) {
+              for (let i = testIdMsgs.length - 1; i >= 0; i--) {
+                const candidate = testIdMsgs[i];
+                if (candidate && candidate.innerText && candidate.innerText.trim().length > 0) {
                   targetElement = candidate;
                   break;
                 }
               }
+              if (targetElement) break;
+            }
+
+            // Strategy 3: Broad fallback selectors for various Claude layouts
+            const claudeFallbackSelectors = [
+              '.font-claude-message',
+              '[data-testid="assistant-message"]',
+              '.claude-message',
+              '[data-is-streaming="false"] .prose',
+              '.prose:not([contenteditable])',
+              '[class*="assistant"] .prose',
+              '[class*="message-content"]',
+              '[class*="response"] .prose',
+              'article .prose'
+            ];
+            for (const sel of claudeFallbackSelectors) {
+              try {
+                const els = document.querySelectorAll(sel);
+                if (els.length > 0) {
+                  for (let i = els.length - 1; i >= 0; i--) {
+                    const candidate = els[i];
+                    if (candidate && candidate.innerText && candidate.innerText.trim().length > 0) {
+                      targetElement = candidate;
+                      break;
+                    }
+                  }
+                  if (targetElement) break;
+                }
+              } catch(e) { /* ignore invalid selector */ }
             }
           }
           break;
@@ -86,6 +118,36 @@
       if (targetElement) {
         return (targetElement.innerText || targetElement.textContent || '').trim();
       }
+
+      // ===== Nuclear fallback for ALL providers =====
+      // If no provider-specific selector matched, scan the page for
+      // non-editable containers with rendered markdown content (p, li, code, pre, etc.)
+      // This handles DOM structure changes and unknown/new providers.
+      try {
+        const candidates = [];
+        document.querySelectorAll('div, article, section').forEach(el => {
+          // Must not be or inside an editable input area
+          if (el.isContentEditable || el.closest('[contenteditable="true"]')) return;
+          // Must not CONTAIN the input area (skip wrapper containers)
+          if (el.querySelector('[contenteditable="true"]')) return;
+          // Skip nav/header/footer/aside elements
+          if (el.closest('nav, header, footer, aside')) return;
+          // Must contain rendered formatted content (rendered markdown)
+          if (!el.querySelector('p, li, pre, code, h1, h2, h3, h4, h5, h6, table, blockquote, ol, ul')) return;
+          // Must have substantial text
+          const text = (el.innerText || '').trim();
+          if (text.length < 30) return;
+          candidates.push({ el, text });
+        });
+
+        if (candidates.length > 0) {
+          // Return the last candidate (most recent response)
+          return candidates[candidates.length - 1].text;
+        }
+      } catch (fallbackErr) {
+        console.error('[ExtractOutput] Fallback error:', fallbackErr);
+      }
+
     } catch (e) {
       console.error('[ExtractOutput] Error extracting text:', e);
     }
@@ -95,7 +157,7 @@
   // Listen for window postMessage from the multi-panel iframe wrapper
   window.addEventListener('message', function(event) {
     // Only accept messages from our extension's multi-panel context
-    if (event.data && event.data.type === 'EXTRACT_LATEST_OUTPUT') {
+    if (event.data && event.data.type === 'EXTRACT_LATEST_OUTPUT' && event.data.context === 'multi-panel') {
       const provider = detectProvider();
       const text = getLatestResponseText(provider);
       

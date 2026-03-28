@@ -83,6 +83,8 @@ function getTargetModifiers(actionType) {
 }
 
 function applyEnterSwapSetting() {
+  if (window.name !== 'panelize-iframe') return;
+  
   chrome.storage.sync.get({
     enterKeyBehavior: DEFAULT_ENTER_KEY_BEHAVIOR
   }, (data) => {
