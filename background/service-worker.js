@@ -35,12 +35,12 @@ async function loadOpenModeSetting() {
 // ============================================
 // Cookie SameSite Fix for iframe embedding
 // ============================================
-// ChatGPT/OpenAI set cookies with SameSite=Lax (browser default).
+// ChatGPT/OpenAI and Grok/X set cookies with SameSite=Lax (browser default).
 // In a chrome-extension:// iframe, this is a cross-site context,
-// so the browser refuses to send those cookies → perpetual "session ended" loop.
+// so the browser refuses to send those cookies → login loops / session failures.
 // Fix: use chrome.cookies API to re-set them with SameSite=None; Secure.
 
-const COOKIE_FIX_DOMAINS = ['chatgpt.com', 'openai.com'];
+const COOKIE_FIX_DOMAINS = ['chatgpt.com', 'openai.com', 'grok.com', 'x.com', 'x.ai'];
 
 function shouldFixCookieSameSite(cookie) {
   if (cookie.sameSite === 'no_restriction') return false;
